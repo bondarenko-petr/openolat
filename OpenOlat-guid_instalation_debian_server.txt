@@ -1,0 +1,272 @@
+Installation guide - LMS - OpenOlat
+
+Debian 12 OS
+
+1. Update
+
+sudo apt update
+
+2. Add a new user - "openolat" and set it for its right of root
+
+sudo adduser openolat && sudo usermod -aG sudo openolat
+
+Switch on user - openolat
+
+su - openolat
+
+3. Install mc
+
+sudo apt install mc
+
+4.  Create a directory downloads and keep the downloaded files there
+
+cd && mkdir downloads && cd downloads
+
+wget https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.6%2B10/OpenJDK17U-jdk_x64_linux_hotspot_17.0.6_10.tar.gz
+wget https://archive.apache.org/dist/tomcat/tomcat-10/v10.1.5/bin/apache-tomcat-10.1.5.tar.gz
+wget https://www.openolat.com/fileadmin/downloads/releases/openolat_1723.war
+	
+
+We use the follows software:
+	-  Java-WM: AdoptOpenJDK 17 LTS: https://adoptopenjdk.net/
+	- Application server: Tomcat 10.1: https://tomcat.apache.org/
+	- OpenOlat application code as pre-compiled .war files: https://www.openolat.com/releases/
+
+5. Prepare home directory
+
+cd && tar xvf downloads/apache-tomcat-10.1.5.tar.gz && ln -s apache-tomcat-10.1.5 tomcat
+
+tar xvf downloads/OpenJDK17U-jdk_x64_linux_hotspot_17.0.6_10.tar.gz && ln -s jdk-17.0.6+10 jre
+
+unzip -d openolat-17.2.3 downloads/openolat_1723.war && ln -s openolat-17.2.3 webapp
+
+6. Create tomcat dirs
+
+mkdir bin conf lib run logs
+
+7. Create Link the following files: web.xml and catalina.sh
+
+cd ~/conf && ln -s ../tomcat/conf/web.xml web.xml
+cd ~/bin && ln -s ../tomcat/bin/catalina.sh catalina.sh
+
+8. Create additional, handy links:
+
+cd && ln -s tomcat/bin/startup.sh start && ln -s tomcat/bin/shutdown.sh stop
+
+9. Create the file ~/bin/setenv.sh containing
+
+nano ~/bin/setenv.sh
+
+// input this code
+
+CATALINA_HOME=~/tomcat
+CATALINA_BASE=~
+JRE_HOME=~/jre
+CATALINA_PID=~/run/openolat.pid
+CATALINA_TMPDIR=/tmp/openolat
+mkdir -p $CATALINA_TMPDIR
+
+CATALINA_OPTS=" \
+-Xmx1024m -Xms512m -XX:MaxMetaspaceSize=512m \
+-Duser.name=openolat \
+-Duser.timezone=Europe/Zurich \
+-Dspring.profiles.active=myprofile \
+-Djava.awt.headless=true \
+-Djava.net.preferIPv4Stack=true \
+-XX:+HeapDumpOnOutOfMemoryError \
+-XX:HeapDumpPath=. \
+"
+10. Create the file ~/conf/server.xml containing
+
+nano ~/conf/server.xml
+
+// input this code
+
+<?xml version='1.0' encoding='utf-8'?>
+<Server port="8085" shutdown="SHUTDOWN">
+  <Service name="Catalina">
+    <Connector port="8088" protocol="HTTP/1.1" />
+    <Engine name="Catalina" defaultHost="localhost">
+      <Host name="localhost"  appBase="webapps" />
+    </Engine>
+  </Service>
+</Server>
+
+// Make sure the chosen ports (8085 and 8088 in this example) are available. 
+
+11. Set the environment variables CATALINA_HOME and JRE_HOME. You need to appending to your ~/.bashrc the follows
+
+nano ~/.bashrc
+
+// input this code
+
+export CATALINA_BASE=~
+export CATALINA_HOME=~/tomcat
+export JRE_HOME=~/jre
+
+// and activate them by issuing
+
+. .bashrc
+
+12. Test tomcat
+
+./start
+
+//... should output look something like this:
+
+Using CATALINA_BASE:   /home/openolat
+Using CATALINA_HOME:   /home/openolat/tomcat
+Using CATALINA_TMPDIR: /tmp/openolat
+Using JRE_HOME:        /home/openolat/jre
+Using CLASSPATH:       /home/openolat/tomcat/bin/bootstrap.jar:/home/openolat/  tomcat/bin/tomcat-juli.jar
+Using CATALINA_OPTS:   -Xmx1024m -Xms512m -XX:MaxMetaspaceSize=512m     -Duser.name=openolat -Duser.timezone=Europe/Zurich      -Dspring.profiles.active=myprofile -Djava.awt.headless=true     -Djava.net.preferIPv4Stack=true -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=.
+Using CATALINA_PID:    /home/openolat/run/openolat.pid
+Existing PID file found during start.
+Removing/clearing stale PID file.
+Tomcat started.
+
+// Check whether these values make sense, then stop tomcat again
+
+./stop
+
+13. Set up postgresql
+
+sudo apt-get update && sudo apt-get install postgresql
+
+// Switch user on "postgres"
+
+sudo -u postgres psql
+
+// now while logged in to postgresql, we create the user and the database:
+
+postgres=# create user oodbu with password 'oodbpasswd';
+postgres=# create database oodb with owner oodbu;
+
+// Just press Ctrl + D, and you'll exit from the PostgreSQL prompt.
+// After to switch on "openolat" with command 
+
+exit
+
+// The database schema is created automatically when starting OpenOlat the first time.
+
+14. OpenOlat configuration
+
+// Create the file ~/lib/olat.local.properties
+
+nano ~/lib/olat.local.properties
+
+// input this code
+
+db.source=jndi
+db.jndi=java:comp/env/jdbc/openolatDS
+db.vendor=postgresql
+installation.dir=/home/openolat
+log.dir=/home/openolat/logs
+server.contextpath=/openolat
+
+server.domainname=localhost
+
+// Change the name of server.domainname on your! We use in our example
+// server.domainname=158.160.64.99
+
+server.port=8088
+server.port.ssl=0
+smtp.host=disabled
+tomcat.id=1
+userdata.dir=/home/openolat/olatdata
+
+15. Application context descriptor
+
+// Create the directory ~/conf/Catalina/localhost/ for the OpenOlat Application context descriptor:
+
+mkdir -p ~/conf/Catalina/localhost/
+
+// and create the file ~/conf/Catalina/localhost/ROOT.xml containing:
+
+nano ~/conf/Catalina/localhost/ROOT.xml
+
+// input this code
+
+<?xml version="1.0" encoding="UTF-8" ?>
+<Context path="" docBase="/home/openolat/webapp" debug="0" reloadable="false" allowLinking="true">
+     <Resource name="jdbc/openolatDS" auth="Container" type="javax.sql.DataSource"
+         maxTotal="16" maxIdle="4" maxWaitMillis="60000"
+         username="oodbu" password="oodbpasswd"
+         driverClassName="org.postgresql.Driver"
+         validationQuery="SELECT 1" 
+         validationQueryTimeout="-1" 
+         testOnBorrow="true" 
+         testOnReturn="false"
+         url="jdbc:postgresql://localhost:5432/oodb"/>
+</Context>
+
+16. Configure log4j2
+
+// Create the file ~/lib/log4j2.xml containing
+
+nano ~/lib/log4j2.xml
+
+// input this code
+
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+   <Appenders>
+       <RollingFile name="RollingFile" fileName="/home/openolat/logs/olat.log"
+           filePattern="/home/openolat/logs/olat.log.%d{yyyy-MM-dd}">
+           <PatternLayout
+                   pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %marker %c{1} ^%%^ I%X{ref}-J%sn ^%%^ %logger{36} ^%%^ %X{identityKey} ^%%^ %X{ip} ^%%^ %X{referer} ^%%^ %X{userAgent} ^%%^ %msg%ex{full,separator( )}%n" />
+           <Policies>
+               <TimeBasedTriggeringPolicy interval="1" />
+           </Policies>
+       </RollingFile>
+   </Appenders>
+   <Loggers>
+       <Logger name="org.apache.commons.httpclient" additivity="false" level="warn">
+           <AppenderRef ref="RollingFile" />
+       </Logger>
+       <Logger name="org.apache.pdfbox" additivity="false" level="fatal">
+           <AppenderRef ref="RollingFile" />
+       </Logger>
+       <Logger name="org.apache.fontbox" additivity="false" level="fatal">
+           <AppenderRef ref="RollingFile" />
+       </Logger>
+       <Logger name="org.hibernate.engine.internal.StatisticalLoggingSessionEventListener" additivity="false" level="fatal">
+           <AppenderRef ref="RollingFile" />
+       </Logger>
+       <!-- Change the level to debug to see the SQL statements generated by Hibernate -->
+       <Logger name="org.hibernate.SQL" additivity="false" level="fatal">
+           <AppenderRef ref="RollingFile" />
+       </Logger>
+        <Logger name="org.hibernate.type.descriptor.sql.BasicBinder" additivity="false" level="fatal">
+            <AppenderRef ref="RollingFile" />
+        </Logger>
+        <Logger name="org.apache.activemq.audit" additivity="false" level="warn">
+           <AppenderRef ref="RollingFile" />
+        </Logger>
+        <Root level="info">
+            <AppenderRef ref="RollingFile" />
+        </Root>
+   </Loggers>
+</Configuration>
+
+17 Done
+// Start OpenOlat
+
+./start
+
+Point your browser to:
+
+http://localhost:8088 
+
+// You need to look at  Step 14 and change your locallhost on your. 
+
+// In our example its look likes http://158.160.64.99:8088 
+
+username: administrator
+password: openolat
+
+
+
+
+
+
