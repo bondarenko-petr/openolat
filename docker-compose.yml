@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  openolat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8088:8088"
+    volumes:
+      - ./setenv.sh:/home/openolat/bin/setenv.sh
+      - ./server.xml:/home/openolat/conf/server.xml
+      - ./olat.local.properties:/home/openolat/lib/olat.local.properties
+      - ./ROOT.xml:/home/openolat/conf/Catalina/localhost/ROOT.xml
+      - ./log4j2.xml:/home/openolat/lib/log4j2.xml
+
+  db:
+    image: postgres:latest
+    restart: always
+    environment:
+      POSTGRES_DB: oodb
+      POSTGRES_USER: oodbu
+      POSTGRES_PASSWORD: oodbpasswd
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
